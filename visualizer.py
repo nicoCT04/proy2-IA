@@ -13,11 +13,25 @@ def save_maze_results(maze, path, visited, name):
     # Matriz para la imagen: Paredes = 0 (Negro), Caminos = 1 (Blanco)
     grid_data = np.array([[0 if cell == '1' else 1 for cell in row] for row in maze.grid])
 
-    plt.figure(figsize=(10, 10))
-    plt.imshow(grid_data, cmap='gray_r', origin='upper', interpolation='nearest')
+    # Crear figura con GridSpec: fila superior para la leyenda, fila inferior para el mapa
+    # aumentar ligeramente el tamaño de la figura y reducir la altura de la leyenda
+    fig = plt.figure(figsize=(11, 11))
+    gs = fig.add_gridspec(2, 1, height_ratios=[0.06, 0.94], hspace=0.02)
 
-    ax = plt.gca()
+    # Eje dedicado solo a la leyenda (arriba)
+    ax_legend = fig.add_subplot(gs[0])
+    ax_legend.axis('off')
+    # asegurar que no tenga parche de fondo que cree un cuadro
+    ax_legend.patch.set_visible(False)
+
+    # Eje principal para el mapa (abajo)
+    ax = fig.add_subplot(gs[1])
     ax.set_aspect('equal')
+    ax.imshow(grid_data, cmap='gray_r', origin='upper', interpolation='nearest')
+    # ocultar ejes y spines para que no aparezca ningún cuadro alrededor
+    ax.axis('off')
+    for spine in ax.spines.values():
+        spine.set_visible(False)
 
     # Capa 1: Nodos explorados (mancha azul claro) - fondo, zorder bajo
     if visited:
@@ -52,20 +66,34 @@ def save_maze_results(maze, path, visited, name):
             else:
                 ax.scatter(g[1], g[0], color='yellow', s=70, marker='X', edgecolor='k', zorder=4)
 
-    # Leyenda única y posicionada sobre la imagen (arriba)
+    # Asegurar que no exista una leyenda residual en el eje del mapa
+    existing_leg = ax.get_legend()
+    if existing_leg is not None:
+        try:
+            existing_leg.remove()
+        except Exception:
+            pass
+
+    # Preparar leyenda: extraer handles únicos y dibujar en el eje superior
     handles, labels = ax.get_legend_handles_labels()
     if labels:
         by_label = dict(zip(labels, handles))
-        ax.legend(by_label.values(), by_label.keys(), loc='upper center', bbox_to_anchor=(0.5, 1.12),
-                  ncol=min(3, len(by_label)), framealpha=0.9)
+        # Dibujar la leyenda centrada en el eje superior (ax_legend)
+        leg = ax_legend.legend(by_label.values(), by_label.keys(), loc='center',
+                               ncol=min(4, len(by_label)), frameon=False, prop={'size': 10})
+        # asegurar que no haya parche que cree un recuadro lateral
+        if leg.get_frame() is not None:
+            leg.get_frame().set_alpha(0.0)
 
-    # Formato final de la imagen
-    plt.title(f"Resultado: {name}\nNodos Visitados: {len(visited)} | Largo: {len(path)-1 if path else 0}")
-    plt.legend(loc='upper right')
-    plt.axis('off')
+    # Título general en la figura (supertitle) y no usar leyenda en el eje del mapa
+    # título general ligeramente más abajo para no superponerse al mapa
+    fig.suptitle(f"Resultado: {name}   Nodos Visitados: {len(visited)} | Largo: {len(path)-1 if path else 0}",
+                 fontsize=12, y=0.975)
 
-    # Guardar en disco
+    # Ajustar márgenes para evitar cuadros laterales y guardar en disco
+    # ajustar márgenes para dejar espacio al título y maximizar área del mapa
+    fig.subplots_adjust(hspace=0.02, left=0, right=1, top=0.96, bottom=0)
     clean_name = name.lower().replace(' ', '_').replace('*', 'star')
     filename = f"results/{clean_name}.png"
-    plt.savefig(filename, bbox_inches='tight', dpi=150)
-    plt.close()
+    fig.savefig(filename, bbox_inches='tight', pad_inches=0.02, dpi=150)
+    plt.close(fig)
