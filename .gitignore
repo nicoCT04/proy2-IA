@@ -1,0 +1,10 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Directorios de resultados 
+results/
+
+# Archivos de sistema
+.DS_Store
