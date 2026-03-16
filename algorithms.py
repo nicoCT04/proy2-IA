@@ -7,78 +7,81 @@ import heapq
 
 class SearchResult:
     def __init__(self, path_length, nodes_explored, execution_time):
-        self.path_length = path_length # Largo del camino [cite: 29]
-        self.nodes_explored = nodes_explored # Cantidad de nodos [cite: 30]
-        self.execution_time = execution_time # Tiempo de ejecución [cite: 31]
+        self.path_length = path_length
+        self.nodes_explored = nodes_explored
+        self.execution_time = execution_time
 
 def bfs(maze):
     start_time = time.time()
     queue = deque([(maze.start, [maze.start])])
-    visited = set([maze.start])
-    nodes_explored = 0
+    visited_set = set([maze.start])
+    visited_ordered = []
 
     while queue:
         current, path = queue.popleft()
-        nodes_explored += 1
+        visited_ordered.append(current)
 
         if current in maze.goals:
-            return SearchResult(len(path) - 1, nodes_explored, time.time() - start_time)
+            res = SearchResult(len(path) - 1, len(visited_ordered), time.time() - start_time)
+            return res, visited_ordered, path
 
         for neighbor in maze.get_neighbors(current):
-            if neighbor not in visited:
-                visited.add(neighbor)
+            if neighbor not in visited_set:
+                visited_set.add(neighbor)
                 queue.append((neighbor, path + [neighbor]))
 
-    return SearchResult(0, nodes_explored, time.time() - start_time)
+    res = SearchResult(0, len(visited_ordered), time.time() - start_time)
+    return res, visited_ordered, []
 
 def dfs(maze):
     start_time = time.time()
     stack = [(maze.start, [maze.start])]
-    visited = set()
-    nodes_explored = 0
+    visited_set = set()
+    visited_ordered = []
 
     while stack:
         current, path = stack.pop()
         
-        if current not in visited:
-            visited.add(current)
-            nodes_explored += 1
+        if current not in visited_set:
+            visited_set.add(current)
+            visited_ordered.append(current)
 
             if current in maze.goals:
-                return SearchResult(len(path) - 1, nodes_explored, time.time() - start_time)
+                res = SearchResult(len(path) - 1, len(visited_ordered), time.time() - start_time)
+                return res, visited_ordered, path
 
-            # Invertimos los vecinos para que el .pop() respete la jerarquía Arriba, Der, Abajo, Izq
+            # Invertimos los vecinos para respetar la jerarquía (Arriba, Derecha, Abajo, Izquierda) al hacer pop()
             neighbors = maze.get_neighbors(current)
             for neighbor in reversed(neighbors):
-                if neighbor not in visited:
+                if neighbor not in visited_set:
                     stack.append((neighbor, path + [neighbor]))
 
-    return SearchResult(0, nodes_explored, time.time() - start_time)
+    res = SearchResult(0, len(visited_ordered), time.time() - start_time)
+    return res, visited_ordered, []
 
 def a_star(maze, heuristic_func):
     start_time = time.time()
-    # Priority queue: (f_cost, count, current_node, path)
-    # count evita empates comparando nodos directamente
     pq = []
     count = 0 
     goal = maze.goals[0] if maze.goals else (0,0)
     
     heapq.heappush(pq, (0, count, maze.start, [maze.start]))
     g_costs = {maze.start: 0}
-    nodes_explored = 0
-    visited = set()
+    visited_set = set()
+    visited_ordered = []
 
     while pq:
         f_cost, _, current, path = heapq.heappop(pq)
         
-        if current in visited:
+        if current in visited_set:
             continue
             
-        visited.add(current)
-        nodes_explored += 1
+        visited_set.add(current)
+        visited_ordered.append(current)
 
         if current in maze.goals:
-            return SearchResult(len(path) - 1, nodes_explored, time.time() - start_time)
+            res = SearchResult(len(path) - 1, len(visited_ordered), time.time() - start_time)
+            return res, visited_ordered, path
 
         for neighbor in maze.get_neighbors(current):
             tentative_g_cost = g_costs[current] + 1
@@ -89,7 +92,8 @@ def a_star(maze, heuristic_func):
                 count += 1
                 heapq.heappush(pq, (f, count, neighbor, path + [neighbor]))
 
-    return SearchResult(0, nodes_explored, time.time() - start_time)
+    res = SearchResult(0, len(visited_ordered), time.time() - start_time)
+    return res, visited_ordered, []
 
 def greedy(maze, heuristic_func):
     start_time = time.time()
@@ -98,25 +102,27 @@ def greedy(maze, heuristic_func):
     goal = maze.goals[0] if maze.goals else (0,0)
     
     heapq.heappush(pq, (0, count, maze.start, [maze.start]))
-    visited = set()
-    nodes_explored = 0
+    visited_set = set()
+    visited_ordered = []
 
     while pq:
         h_cost, _, current, path = heapq.heappop(pq)
         
-        if current in visited:
+        if current in visited_set:
             continue
             
-        visited.add(current)
-        nodes_explored += 1
+        visited_set.add(current)
+        visited_ordered.append(current)
 
         if current in maze.goals:
-            return SearchResult(len(path) - 1, nodes_explored, time.time() - start_time)
+            res = SearchResult(len(path) - 1, len(visited_ordered), time.time() - start_time)
+            return res, visited_ordered, path
 
         for neighbor in maze.get_neighbors(current):
-            if neighbor not in visited:
+            if neighbor not in visited_set:
                 count += 1
                 h = heuristic_func(neighbor, goal)
                 heapq.heappush(pq, (h, count, neighbor, path + [neighbor]))
 
-    return SearchResult(0, nodes_explored, time.time() - start_time)
+    res = SearchResult(0, len(visited_ordered), time.time() - start_time)
+    return res, visited_ordered, []

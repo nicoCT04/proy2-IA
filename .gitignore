@@ -5,6 +5,10 @@ __pycache__/
 
 # Directorios de resultados 
 results/
+results/*.png
 
 # Archivos de sistema
 .DS_Store
+
+#venv
+.venv/
