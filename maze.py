@@ -1,6 +1,7 @@
 """
 Módulo del Laberinto
 """
+import random
 
 class Maze:
     def __init__(self, filepath):
@@ -38,3 +39,16 @@ class Maze:
                     neighbors.append((new_row, new_col))
                     
         return neighbors
+    
+    def set_random_start(self):
+        """Asigna un punto de partida aleatorio en un camino libre."""
+        free_spaces = []
+        for r in range(len(self.grid)):
+            for c in range(len(self.grid[0])):
+                if self.grid[r][c] == '0':
+                    free_spaces.append((r, c))
+        
+        if free_spaces:
+            self.start = random.choice(free_spaces)
+            return self.start
+        return None

@@ -80,15 +80,16 @@ def save_maze_results(maze, path, visited, name):
         by_label = dict(zip(labels, handles))
         # Dibujar la leyenda centrada en el eje superior (ax_legend)
         leg = ax_legend.legend(by_label.values(), by_label.keys(), loc='center',
-                               ncol=min(4, len(by_label)), frameon=False, prop={'size': 10})
+                                ncol=min(4, len(by_label)), frameon=False, prop={'size': 10})
         # asegurar que no haya parche que cree un recuadro lateral
         if leg.get_frame() is not None:
             leg.get_frame().set_alpha(0.0)
 
     # Título general en la figura (supertitle) y no usar leyenda en el eje del mapa
-    # título general ligeramente más abajo para no superponerse al mapa
-    fig.suptitle(f"Resultado: {name}   Nodos Visitados: {len(visited)} | Largo: {len(path)-1 if path else 0}",
-                 fontsize=12, y=0.975)
+    # título en dos filas: primera fila con el resultado, segunda con métricas
+    fig.suptitle(f"Resultado: {name}", fontsize=13, y=0.99)
+    metrics_line = f"Nodos Visitados: {len(visited)} | Largo: {len(path)-1 if path else 0}"
+    fig.text(0.5, 0.965, metrics_line, ha='center', fontsize=10)
 
     # Ajustar márgenes para evitar cuadros laterales y guardar en disco
     # ajustar márgenes para dejar espacio al título y maximizar área del mapa
