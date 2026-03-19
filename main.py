@@ -1,16 +1,18 @@
 """
-Punto de Entrada - Maze Solver
+Punto de Entrada - Maze Solver (Refactorizado)
 Proyecto #2: Búsqueda y Heurísticas
 Autor: Nicolás Concuá
 """
+
 import sys
 from maze import Maze
 import algorithms
 from heuristics import manhattan, euclidean
 from visualizer import save_maze_results
 
+
 def display_metrics(name, result):
-    """Imprime las métricas requeridas en consola de forma ordenada."""
+    """Imprime las métricas de forma ordenada."""
     print(f"--- {name} ---")
     print(f"Nodos visitados:     {result.nodes_explored}")
     print(f"Largo del camino:    {result.path_length}")
@@ -18,40 +20,56 @@ def display_metrics(name, result):
 
 def main():
     if len(sys.argv) < 2:
-        print("Error. Uso correcto: python main.py <ruta_al_laberinto.txt>")
+        print("Uso correcto: python main.py <ruta_al_laberinto.txt>")
         return
 
     filepath = sys.argv[1]
-    print(f"Cargando laberinto desde: {filepath}...\n")
-    maze = Maze(filepath)
 
-    if not maze.start or not maze.goals:
-        print("Error: El laberinto no tiene un punto de partida ('2') o una salida ('3').")
+    try:
+        print(f"Cargando laberinto desde: {filepath}...\n")
+        maze = Maze(filepath)
+
+    except FileNotFoundError:
+        print("Error: El archivo no existe.")
+        return
+
+    except ValueError as e:
+        print(f"Error en el laberinto: {e}")
+        return
+
+    except Exception as e:
+        print(f"Error inesperado: {e}")
         return
 
     print("Ejecutando algoritmos y generando visualizaciones en ./results/\n")
 
-    # 1. Breadth First Search (BFS)
-    res_bfs, visited_bfs, path_bfs = algorithms.bfs(maze)
-    display_metrics("BFS", res_bfs)
-    save_maze_results(maze, path_bfs, visited_bfs, "BFS")
+    try:
 
-    # 2. Depth First Search (DFS)
-    res_dfs, visited_dfs, path_dfs = algorithms.dfs(maze)
-    display_metrics("DFS", res_dfs)
-    save_maze_results(maze, path_dfs, visited_dfs, "DFS")
+        # BFS
+        res_bfs = algorithms.bfs(maze)
+        display_metrics("BFS", res_bfs)
+        save_maze_results(maze, res_bfs.path, res_bfs.visited_ordered, "BFS")
 
-    # 3. Greedy First Search (Usando Manhattan)
-    res_greedy, visited_greedy, path_greedy = algorithms.greedy(maze, manhattan)
-    display_metrics("Greedy (Manhattan)", res_greedy)
-    save_maze_results(maze, path_greedy, visited_greedy, "Greedy Manhattan")
+        # DFS
+        res_dfs = algorithms.dfs(maze)
+        display_metrics("DFS", res_dfs)
+        save_maze_results(maze, res_dfs.path, res_dfs.visited_ordered, "DFS")
 
-    # 4. A* Search (Usando Euclidiana)
-    res_astar, visited_astar, path_astar = algorithms.a_star(maze, euclidean)
-    display_metrics("A* (Euclidiana)", res_astar)
-    save_maze_results(maze, path_astar, visited_astar, "A Star Euclidiana")
+        # Greedy (Manhattan)
+        res_greedy = algorithms.greedy(maze, manhattan)
+        display_metrics("Greedy (Manhattan)", res_greedy)
+        save_maze_results(maze, res_greedy.path, res_greedy.visited_ordered, "Greedy Manhattan")
 
-    print("¡Proceso completado! Revisa la carpeta 'results/' para ver las imágenes.")
+        # A* (Euclidiana)
+        res_astar = algorithms.a_star(maze, euclidean)
+        display_metrics("A* (Euclidiana)", res_astar)
+        save_maze_results(maze, res_astar.path, res_astar.visited_ordered, "A Star Euclidiana")
 
-if __name__ == "__main__":
-    main()
+    except Exception as e:
+        print(f"Error durante la ejecución de algoritmos: {e}")
+        return
+
+    print("Proceso completado. Revisa la carpeta 'results/' para ver las imágenes.")
+
+
+main()

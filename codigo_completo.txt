@@ -1,0 +1,576 @@
+================================================================================
+                        CODIGO COMPLETO DEL PROYECTO
+                   Maze Solver - Proyecto #2: Búsqueda y Heurísticas
+                           Universidad Valle de Guatemala
+================================================================================
+
+================================================================================
+ARCHIVO 1: algorithms.py
+================================================================================
+
+"""
+Módulo de Algoritmos de Búsqueda
+"""
+import time
+from collections import deque
+import heapq
+
+class SearchResult:
+    def __init__(self, path_length, nodes_explored, execution_time):
+        self.path_length = path_length
+        self.nodes_explored = nodes_explored
+        self.execution_time = execution_time
+
+def bfs(maze):
+    start_time = time.time()
+    queue = deque([(maze.start, [maze.start])])
+    visited_set = set([maze.start])
+    visited_ordered = []
+
+    while queue:
+        current, path = queue.popleft()
+        visited_ordered.append(current)
+
+        if current in maze.goals:
+            res = SearchResult(len(path) - 1, len(visited_ordered), time.time() - start_time)
+            return res, visited_ordered, path
+
+        for neighbor in maze.get_neighbors(current):
+            if neighbor not in visited_set:
+                visited_set.add(neighbor)
+                queue.append((neighbor, path + [neighbor]))
+
+    res = SearchResult(0, len(visited_ordered), time.time() - start_time)
+    return res, visited_ordered, []
+
+def dfs(maze):
+    start_time = time.time()
+    stack = [(maze.start, [maze.start])]
+    visited_set = set()
+    visited_ordered = []
+
+    while stack:
+        current, path = stack.pop()
+        
+        if current not in visited_set:
+            visited_set.add(current)
+            visited_ordered.append(current)
+
+            if current in maze.goals:
+                res = SearchResult(len(path) - 1, len(visited_ordered), time.time() - start_time)
+                return res, visited_ordered, path
+
+            # Invertimos los vecinos para respetar la jerarquía (Arriba, Derecha, Abajo, Izquierda) al hacer pop()
+            neighbors = maze.get_neighbors(current)
+            for neighbor in reversed(neighbors):
+                if neighbor not in visited_set:
+                    stack.append((neighbor, path + [neighbor]))
+
+    res = SearchResult(0, len(visited_ordered), time.time() - start_time)
+    return res, visited_ordered, []
+
+def a_star(maze, heuristic_func):
+    start_time = time.time()
+    pq = []
+    count = 0 
+    goal = maze.goals[0] if maze.goals else (0,0)
+    
+    heapq.heappush(pq, (0, count, maze.start, [maze.start]))
+    g_costs = {maze.start: 0}
+    visited_set = set()
+    visited_ordered = []
+
+    while pq:
+        f_cost, _, current, path = heapq.heappop(pq)
+        
+        if current in visited_set:
+            continue
+            
+        visited_set.add(current)
+        visited_ordered.append(current)
+
+        if current in maze.goals:
+            res = SearchResult(len(path) - 1, len(visited_ordered), time.time() - start_time)
+            return res, visited_ordered, path
+
+        for neighbor in maze.get_neighbors(current):
+            tentative_g_cost = g_costs[current] + 1
+            
+            if neighbor not in g_costs or tentative_g_cost < g_costs[neighbor]:
+                g_costs[neighbor] = tentative_g_cost
+                f = tentative_g_cost + heuristic_func(neighbor, goal)
+                count += 1
+                heapq.heappush(pq, (f, count, neighbor, path + [neighbor]))
+
+    res = SearchResult(0, len(visited_ordered), time.time() - start_time)
+    return res, visited_ordered, []
+
+def greedy(maze, heuristic_func):
+    start_time = time.time()
+    pq = []
+    count = 0
+    goal = maze.goals[0] if maze.goals else (0,0)
+    
+    heapq.heappush(pq, (0, count, maze.start, [maze.start]))
+    visited_set = set()
+    visited_ordered = []
+
+    while pq:
+        h_cost, _, current, path = heapq.heappop(pq)
+        
+        if current in visited_set:
+            continue
+            
+        visited_set.add(current)
+        visited_ordered.append(current)
+
+        if current in maze.goals:
+            res = SearchResult(len(path) - 1, len(visited_ordered), time.time() - start_time)
+            return res, visited_ordered, path
+
+        for neighbor in maze.get_neighbors(current):
+            if neighbor not in visited_set:
+                count += 1
+                h = heuristic_func(neighbor, goal)
+                heapq.heappush(pq, (h, count, neighbor, path + [neighbor]))
+
+    res = SearchResult(0, len(visited_ordered), time.time() - start_time)
+    return res, visited_ordered, []
+
+================================================================================
+ARCHIVO 2: heuristics.py
+================================================================================
+
+"""
+Módulo de Heurísticas
+
+Referencias (APA 7ma ed.):
+Russell, S. J., & Norvig, P. (2021). Artificial Intelligence: A Modern Approach (4th ed.). Pearson.
+"""
+import math
+
+def euclidean(p1, p2):
+    """Calcula la distancia en línea recta entre dos puntos."""
+    return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
+
+def manhattan(p1, p2):
+    """Calcula la suma de las diferencias absolutas de sus coordenadas cartesianas."""
+    return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
+
+================================================================================
+ARCHIVO 3: maze.py
+================================================================================
+
+"""
+Módulo del Laberinto
+"""
+import random
+
+class Maze:
+    def __init__(self, filepath):
+        self.grid = []
+        self.start = None
+        self.goals = []
+        self.load_maze(filepath)
+        
+        # Jerarquía de movimientos: Arriba, Derecha, Abajo, Izquierda 
+        # Representado como (delta_fila, delta_columna)
+        self.directions = [(-1, 0), (0, 1), (1, 0), (0, -1)]
+
+    def load_maze(self, filepath):
+        """Lee el archivo .txt y mapea los estados del laberinto."""
+        with open(filepath, 'r') as file:
+            for row_idx, line in enumerate(file):
+                row = list(line.strip())
+                self.grid.append(row)
+                for col_idx, char in enumerate(row):
+                    if char == '2': # Punto de partida [cite: 12]
+                        self.start = (row_idx, col_idx)
+                    elif char == '3': # Punto de salida [cite: 14]
+                        self.goals.append((row_idx, col_idx))
+
+    def get_neighbors(self, position):
+        """Devuelve los vecinos válidos respetando la jerarquía de movimientos."""
+        row, col = position
+        neighbors = []
+        
+        for dr, dc in self.directions:
+            new_row, new_col = row + dr, col + dc
+            # Verifica límites y si el camino está libre ('0' o '3') [cite: 10, 14]
+            if (0 <= new_row < len(self.grid) and 0 <= new_col < len(self.grid[0])):
+                if self.grid[new_row][new_col] in ['0', '3', '2']:
+                    neighbors.append((new_row, new_col))
+                    
+        return neighbors
+    
+    def set_random_start(self):
+        """Asigna un punto de partida aleatorio en un camino libre."""
+        free_spaces = []
+        for r in range(len(self.grid)):
+            for c in range(len(self.grid[0])):
+                if self.grid[r][c] == '0':
+                    free_spaces.append((r, c))
+        
+        if free_spaces:
+            self.start = random.choice(free_spaces)
+            return self.start
+        return None
+
+================================================================================
+ARCHIVO 4: visualizer.py
+================================================================================
+
+"""
+Módulo de Visualización
+"""
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+
+def save_maze_results(maze, path, visited, name):
+    """Genera y guarda una representación visual del laberinto resuelto."""
+    if not os.path.exists('results'):
+        os.makedirs('results')
+
+    # Matriz para la imagen: Paredes = 0 (Negro), Caminos = 1 (Blanco)
+    grid_data = np.array([[0 if cell == '1' else 1 for cell in row] for row in maze.grid])
+
+    # Crear figura con GridSpec: fila superior para la leyenda, fila inferior para el mapa
+    # aumentar ligeramente el tamaño de la figura y reducir la altura de la leyenda
+    fig = plt.figure(figsize=(11, 11))
+    gs = fig.add_gridspec(2, 1, height_ratios=[0.06, 0.94], hspace=0.02)
+
+    # Eje dedicado solo a la leyenda (arriba)
+    ax_legend = fig.add_subplot(gs[0])
+    ax_legend.axis('off')
+    # asegurar que no tenga parche de fondo que cree un cuadro
+    ax_legend.patch.set_visible(False)
+
+    # Eje principal para el mapa (abajo)
+    ax = fig.add_subplot(gs[1])
+    ax.set_aspect('equal')
+    ax.imshow(grid_data, cmap='gray_r', origin='upper', interpolation='nearest')
+    # ocultar ejes y spines para que no aparezca ningún cuadro alrededor
+    ax.axis('off')
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    # Capa 1: Nodos explorados (mancha azul claro) - fondo, zorder bajo
+    if visited:
+        visited_arr = np.array(list(visited))
+        if visited_arr.size > 0:
+            v_rows = visited_arr[:, 0]
+            v_cols = visited_arr[:, 1]
+            ax.scatter(v_cols, v_rows, color='#3498db', s=6, alpha=0.35, label='Explorado', zorder=1)
+
+    # Capa 2: Camino final (línea roja) - encima de explorados, zorder alto
+    if path:
+        path_arr = np.array(path)
+        if path_arr.size > 0:
+            p_rows = path_arr[:, 0]
+            p_cols = path_arr[:, 1]
+            ax.plot(p_cols, p_rows, color='#e74c3c', linewidth=2.5, label='Camino Solución', zorder=3)
+
+    # Capa 3: Puntos de Inicio y Fin - siempre por encima (zorder máximo)
+    # Si hay camino, marcar inicio/fin a partir del mismo para consistencia
+    if path and len(path) > 0:
+        start_pt = path[0]
+        end_pt = path[-1]
+        ax.scatter(start_pt[1], start_pt[0], color='green', s=50, marker='o', edgecolor='k', label='Inicio', zorder=4)
+        ax.scatter(end_pt[1], end_pt[0], color='yellow', s=70, marker='X', edgecolor='k', label='Meta', zorder=4)
+    else:
+        if getattr(maze, 'start', None):
+            ax.scatter(maze.start[1], maze.start[0], color='green', s=50, marker='o', edgecolor='k', label='Inicio', zorder=4)
+        # dibujar metas sin repetir etiquetas
+        for idx, g in enumerate(getattr(maze, 'goals', []) or []):
+            if idx == 0:
+                ax.scatter(g[1], g[0], color='yellow', s=70, marker='X', edgecolor='k', label='Meta', zorder=4)
+            else:
+                ax.scatter(g[1], g[0], color='yellow', s=70, marker='X', edgecolor='k', zorder=4)
+
+    # Asegurar que no exista una leyenda residual en el eje del mapa
+    existing_leg = ax.get_legend()
+    if existing_leg is not None:
+        try:
+            existing_leg.remove()
+        except Exception:
+            pass
+
+    # Preparar leyenda: extraer handles únicos y dibujar en el eje superior
+    handles, labels = ax.get_legend_handles_labels()
+    if labels:
+        by_label = dict(zip(labels, handles))
+        # Dibujar la leyenda centrada en el eje superior (ax_legend)
+        leg = ax_legend.legend(by_label.values(), by_label.keys(), loc='center',
+                                ncol=min(4, len(by_label)), frameon=False, prop={'size': 10})
+        # asegurar que no haya parche que cree un recuadro lateral
+        if leg.get_frame() is not None:
+            leg.get_frame().set_alpha(0.0)
+
+    # Título general en la figura (supertitle) y no usar leyenda en el eje del mapa
+    # título en dos filas: primera fila con el resultado, segunda con métricas
+    fig.suptitle(f"Resultado: {name}", fontsize=13, y=0.99)
+    metrics_line = f"Nodos Visitados: {len(visited)} | Largo: {len(path)-1 if path else 0}"
+    fig.text(0.5, 0.965, metrics_line, ha='center', fontsize=10)
+
+    # Ajustar márgenes para evitar cuadros laterales y guardar en disco
+    # ajustar márgenes para dejar espacio al título y maximizar área del mapa
+    fig.subplots_adjust(hspace=0.02, left=0, right=1, top=0.96, bottom=0)
+    clean_name = name.lower().replace(' ', '_').replace('*', 'star')
+    filename = f"results/{clean_name}.png"
+    fig.savefig(filename, bbox_inches='tight', pad_inches=0.02, dpi=150)
+    plt.close(fig)
+
+================================================================================
+ARCHIVO 5: main.py
+================================================================================
+
+"""
+Punto de Entrada - Maze Solver
+Proyecto #2: Búsqueda y Heurísticas
+Autor: Nicolás Concuá
+"""
+import sys
+from maze import Maze
+import algorithms
+from heuristics import manhattan, euclidean
+from visualizer import save_maze_results
+
+def display_metrics(name, result):
+    """Imprime las métricas requeridas en consola de forma ordenada."""
+    print(f"--- {name} ---")
+    print(f"Nodos visitados:     {result.nodes_explored}")
+    print(f"Largo del camino:    {result.path_length}")
+    print(f"Tiempo de ejecución: {result.execution_time:.6f} s\n")
+
+def main():
+    if len(sys.argv) < 2:
+        print("Error. Uso correcto: python main.py <ruta_al_laberinto.txt>")
+        return
+
+    filepath = sys.argv[1]
+    print(f"Cargando laberinto desde: {filepath}...\n")
+    maze = Maze(filepath)
+
+    if not maze.start or not maze.goals:
+        print("Error: El laberinto no tiene un punto de partida ('2') o una salida ('3').")
+        return
+
+    print("Ejecutando algoritmos y generando visualizaciones en ./results/\n")
+
+    # 1. Breadth First Search (BFS)
+    res_bfs, visited_bfs, path_bfs = algorithms.bfs(maze)
+    display_metrics("BFS", res_bfs)
+    save_maze_results(maze, path_bfs, visited_bfs, "BFS")
+
+    # 2. Depth First Search (DFS)
+    res_dfs, visited_dfs, path_dfs = algorithms.dfs(maze)
+    display_metrics("DFS", res_dfs)
+    save_maze_results(maze, path_dfs, visited_dfs, "DFS")
+
+    # 3. Greedy First Search (Usando Manhattan)
+    res_greedy, visited_greedy, path_greedy = algorithms.greedy(maze, manhattan)
+    display_metrics("Greedy (Manhattan)", res_greedy)
+    save_maze_results(maze, path_greedy, visited_greedy, "Greedy Manhattan")
+
+    # 4. A* Search (Usando Euclidiana)
+    res_astar, visited_astar, path_astar = algorithms.a_star(maze, euclidean)
+    display_metrics("A* (Euclidiana)", res_astar)
+    save_maze_results(maze, path_astar, visited_astar, "A Star Euclidiana")
+
+    print("¡Proceso completado! Revisa la carpeta 'results/' para ver las imágenes.")
+
+if __name__ == "__main__":
+    main()
+
+================================================================================
+ARCHIVO 6: app.py
+================================================================================
+
+"""
+Interfaz Gráfica Streamlit - Maze Solver
+Proyecto #2: Búsqueda y Heurísticas
+Nicolás Concuá - UVG
+"""
+import streamlit as st
+import tempfile
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import time 
+
+from maze import Maze
+import algorithms
+from heuristics import manhattan, euclidean
+
+# Configuración inicial
+st.set_page_config(page_title="Maze Solver - Proyecto 2", layout="wide")
+
+# Inicializar estados de sesión para evitar AttributeErrors
+if 'last_results' not in st.session_state:
+    st.session_state.last_results = None
+if 'maze_obj' not in st.session_state:
+    st.session_state.maze_obj = None
+if 'current_h' not in st.session_state:
+    st.session_state.current_h = "Manhattan"
+
+# --- FUNCIONES DE APOYO ---
+
+def calculate_ebf(n_explored, depth):
+    """Calcula el Effective Branching Factor aproximado."""
+    if depth <= 0 or n_explored <= 0:
+        return 0
+    return round(pow(n_explored, 1/depth), 4)
+
+def render_maze_pyplot(maze, path, visited, title):
+    fig, ax = plt.subplots(figsize=(8, 8))
+    grid_data = np.array([[0 if cell == '1' else 1 for cell in row] for row in maze.grid])
+    ax.imshow(grid_data, cmap='gray', origin='upper')
+
+    if visited:
+        v_rows, v_cols = zip(*visited)
+        ax.scatter(v_cols, v_rows, color='#3498db', s=5, alpha=0.4)
+
+    if path:
+        p_rows, p_cols = zip(*path)
+        ax.plot(p_cols, p_rows, color='#e74c3c', linewidth=2.5)
+
+    if maze.start:
+        ax.plot(maze.start[1], maze.start[0], 'go', markersize=8)
+    for g in maze.goals:
+        ax.plot(g[1], g[0], 'yx', markersize=10, markeredgewidth=2)
+
+    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.axis('off')
+    return fig
+
+def animate_maze_pyplot(maze, visited, path, title):
+    placeholder = st.empty() 
+    grid_data = np.array([[0 if cell == '1' else 1 for cell in row] for row in maze.grid])
+    
+    if not path:
+        st.warning(f"No hay camino para animar en {title}")
+        return
+
+    v_rows, v_cols = zip(*visited) if visited else ([], [])
+    step = max(1, len(path) // 40)
+    
+    for i in range(1, len(path) + 1, step):
+        fig, ax = plt.subplots(figsize=(7, 7))
+        ax.imshow(grid_data, cmap='gray', origin='upper')
+        
+        if visited:
+            ax.scatter(v_cols, v_rows, color='#3498db', s=5, alpha=0.2)
+        
+        current_path = path[:i]
+        p_rows, p_cols = zip(*current_path)
+        ax.plot(p_cols, p_rows, color='#e74c3c', linewidth=2.5)
+        
+        if maze.start:
+            ax.plot(maze.start[1], maze.start[0], 'go', markersize=8)
+        for g in maze.goals:
+            ax.plot(g[1], g[0], 'yx', markersize=10)
+            
+        ax.set_title(f"Trazando Ruta: {title} ({i-1} pasos)", fontsize=12)
+        ax.axis('off')
+        placeholder.pyplot(fig)
+        plt.close(fig)
+        time.sleep(0.02)
+
+# --- INTERFAZ ---
+
+st.title("🧩 Maze Solver - Análisis de Algoritmos")
+st.markdown("### 📖 Simbología: 🟢 Inicio | 🟡 Meta | 🔵 Exploración | 🔴 Ruta Final")
+
+with st.sidebar:
+    st.header("⚙️ Configuración")
+    uploaded_file = st.file_uploader("Cargar laberinto (.txt)", type=['txt'])
+    start_mode = st.radio("Punto de Partida:", ["Original", "Aleatorio"])
+    
+    st.subheader("🧠 Algoritmos")
+    h_name = st.selectbox("Heurística:", ["Manhattan", "Euclidiana"])
+    sel_h = manhattan if h_name == "Manhattan" else euclidean
+    
+    algo_choice = st.selectbox("Algoritmo:", ["Todos", "BFS", "DFS", "Greedy", "A*"])
+    st.divider()
+    run_btn = st.button("🚀 Resolver Laberinto", type="primary", use_container_width=True)
+
+# --- PROCESAMIENTO ---
+
+if uploaded_file is not None:
+    if run_btn:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as tmp:
+            tmp.write(uploaded_file.getvalue())
+            tmp_path = tmp.name
+
+        maze = Maze(tmp_path)
+        if start_mode == "Aleatorio":
+            maze.set_random_start()
+
+        results = {}
+        if algo_choice in ["Todos", "BFS"]: results["BFS"] = algorithms.bfs(maze)
+        if algo_choice in ["Todos", "DFS"]: results["DFS"] = algorithms.dfs(maze)
+        if algo_choice in ["Todos", "Greedy"]: results["Greedy"] = algorithms.greedy(maze, sel_h)
+        if algo_choice in ["Todos", "A*"]: results["A*"] = algorithms.a_star(maze, sel_h)
+        
+        st.session_state.last_results = results
+        st.session_state.maze_obj = maze
+        st.session_state.current_h = h_name
+
+    if st.session_state.last_results:
+        tab1, tab2 = st.tabs(["📊 Análisis Estadístico", "🎥 Modo Animación"])
+
+        with tab1:
+            res_dict = st.session_state.last_results
+            m_obj = st.session_state.maze_obj
+            
+            # Gráficas y Métricas
+            cols = st.columns(len(res_dict))
+            for idx, (name, (res, visited, path)) in enumerate(res_dict.items()):
+                with cols[idx]:
+                    st.metric(f"{name} (Nodos)", res.nodes_explored)
+                    st.pyplot(render_maze_pyplot(m_obj, path, visited, name))
+            
+            # Tabla de Datos para el Informe
+            st.divider()
+            st.subheader("📝 Datos para el Reporte (APA 7)")
+            
+            data_summary = []
+            for name, (res, _, _) in res_dict.items():
+                h_val = st.session_state.current_h if name in ["Greedy", "A*"] else "N/A"
+                # Calculamos el Branching Factor dinámicamente
+                ebf = calculate_ebf(res.nodes_explored, res.path_length)
+                
+                data_summary.append({
+                    "Algoritmo": name,
+                    "Heurística": h_val,
+                    "Nodos Visitados (N)": res.nodes_explored,
+                    "Largo Camino (d)": res.path_length,
+                    "Branching Factor (b*)": ebf,
+                    "Tiempo (ms)": round(res.execution_time * 1000, 4)
+                })
+            
+            df = pd.DataFrame(data_summary)
+            st.table(df)
+            
+            # Botón de Descarga
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Descargar CSV de Resultados", csv, "resultados_ia.csv", "text/csv")
+
+        with tab2:
+            st.subheader("🎥 Animación del Recorrido")
+            if st.button("▶️ Iniciar Reproducción"):
+                for name, (res, visited, path) in st.session_state.last_results.items():
+                    st.write(f"### Animando: {name}")
+                    animate_maze_pyplot(st.session_state.maze_obj, visited, path, name)
+
+================================================================================
+                                FIN DEL ARCHIVO
+================================================================================
+
+RESUMEN DEL PROYECTO:
+- Total de archivos Python: 6
+- Módulos principales: algorithms, heuristics, maze, visualizer, main, app
+- Tipos de algoritmos implementados: BFS, DFS, Greedy, A*
+- Heurísticas disponibles: Manhattan, Euclidiana
+- Interfaz: Streamlit (app.py) + CLI (main.py)
